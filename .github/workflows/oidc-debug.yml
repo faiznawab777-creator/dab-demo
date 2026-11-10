@@ -1,0 +1,50 @@
+
+name: Verify GitHub OIDC Claims
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-dev:
+    name: Verify DEV OIDC subject
+    runs-on: ubuntu-latest
+    environment: dev
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Display non-sensitive OIDC claims
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import json
+          import base64
+          import urllib.request
+
+          url = os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
+          token = os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]
+
+          request = urllib.request.Request(
+              url,
+              headers={"Authorization": f"Bearer {token}"}
+          )
+
+          with urllib.request.urlopen(request) as response:
+              jwt = json.load(response)["value"]
+
+          payload = jwt.split(".")[1]
+          payload += "=" * (-len(payload) % 4)
+
+          claims = json.loads(
+              base64.urlsafe_b64decode(payload)
+          )
+
+          for key in ["iss", "aud", "sub"]:
+              print(f"{key}: {claims.get(key)}")
+          PY
