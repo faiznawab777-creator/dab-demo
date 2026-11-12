@@ -1,0 +1,15 @@
+resources:
+  pipelines:
+    pipeline_finance_transaction_analytics:
+      name: ${bundle.target}-finance-transaction-analytics
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true
+      development: true
+      channel: CURRENT
+      configuration:
+        finance.catalog: ${var.catalog}
+        finance.schema: ${var.schema}
+      libraries:
+        - file:
+            path: ../../src/pipelines/finance_transaction_analytics/transformations/finance_transaction_pipeline.py
