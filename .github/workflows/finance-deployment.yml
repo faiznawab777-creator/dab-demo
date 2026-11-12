@@ -1,0 +1,196 @@
+
+name: Finance POC - DAB Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+  # Optional: allows manual redeployment of the current main branch.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: finance-dab-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+
+  # ----------------------------------------
+  # 1. Build and package the merged revision
+  # ----------------------------------------
+
+  build-artifact:
+    name: Build Finance POC artifact
+
+    if: github.ref == 'refs/heads/main'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests and compile checks
+        run: |
+          pytest -q
+          python -m compileall -q src tests
+
+      - name: Package bundle source
+        run: |
+          tar -czf finance-dab-${GITHUB_SHA}.tar.gz \
+            databricks.yml resources src pyproject.toml requirements.txt README.md
+
+      - name: Upload immutable workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-dab-${{ github.sha }}
+          path: finance-dab-${{ github.sha }}.tar.gz
+          if-no-files-found: error
+          retention-days: 30
+
+  # ----------------------------------------
+  # 2. Deploy DEV
+  # ----------------------------------------
+
+  deploy-dev:
+    name: Deploy Finance POC to DEV
+
+    if: github.ref == 'refs/heads/main'
+
+    needs: build-artifact
+
+    runs-on: ubuntu-latest
+
+    environment: dev
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      DATABRICKS_AUTH_TYPE: oauth-m2m
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+
+      BUNDLE_VAR_workspace_host: ${{ vars.DATABRICKS_HOST }}
+      BUNDLE_VAR_run_as_spn: ${{ vars.DATABRICKS_RUN_AS_SP }}
+      BUNDLE_VAR_job_cluster_id: ${{ vars.DATABRICKS_JOB_CLUSTER_ID }}
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: finance-dab-${{ github.sha }}
+          path: ${{ runner.temp }}/finance-artifact
+
+      - name: Extract artifact
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/bundle"
+          tar -xzf "$RUNNER_TEMP/finance-artifact/finance-dab-${GITHUB_SHA}.tar.gz" \
+            -C "$GITHUB_WORKSPACE/bundle"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Verify Databricks identity
+        run: databricks current-user me
+
+      - name: Validate DEV bundle
+        working-directory: bundle
+        run: databricks bundle validate --target dev
+
+      - name: Deploy DEV bundle
+        working-directory: bundle
+        run: databricks bundle deploy --target dev
+
+      - name: Run Finance job in DEV
+        working-directory: bundle
+        run: databricks bundle run --target dev job_finance_transaction_analytics
+
+      - name: Run Finance SDP pipeline in DEV
+        working-directory: bundle
+        run: databricks bundle run --target dev pipeline_finance_transaction_analytics
+
+  # ----------------------------------------
+  # 3. Deploy PREPROD after DEV succeeds
+  # ----------------------------------------
+
+  deploy-preprod:
+    name: Deploy Finance POC to PREPROD
+
+    if: github.ref == 'refs/heads/main'
+
+    needs:
+      - build-artifact
+      - deploy-dev
+
+    runs-on: ubuntu-latest
+
+    environment: preprod
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      DATABRICKS_AUTH_TYPE: oauth-m2m
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+
+      BUNDLE_VAR_workspace_host: ${{ vars.DATABRICKS_HOST }}
+      BUNDLE_VAR_run_as_spn: ${{ vars.DATABRICKS_RUN_AS_SP }}
+      BUNDLE_VAR_job_cluster_id: ${{ vars.DATABRICKS_JOB_CLUSTER_ID }}
+
+    steps:
+      - name: Download same artifact used in DEV
+        uses: actions/download-artifact@v4
+        with:
+          name: finance-dab-${{ github.sha }}
+          path: ${{ runner.temp }}/finance-artifact
+
+      - name: Extract artifact
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/bundle"
+          tar -xzf "$RUNNER_TEMP/finance-artifact/finance-dab-${GITHUB_SHA}.tar.gz" \
+            -C "$GITHUB_WORKSPACE/bundle"
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Verify Databricks identity
+        run: databricks current-user me
+
+      - name: Validate PREPROD bundle
+        working-directory: bundle
+        run: databricks bundle validate --target preprod
+
+      - name: Deploy PREPROD bundle
+        working-directory: bundle
+        run: databricks bundle deploy --target preprod
+
+      - name: Run Finance job in PREPROD
+        working-directory: bundle
+        run: databricks bundle run --target preprod job_finance_transaction_analytics
+
+      - name: Run Finance SDP pipeline in PREPROD
+        working-directory: bundle
+        run: databricks bundle run --target preprod pipeline_finance_transaction_analytics

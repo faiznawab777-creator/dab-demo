@@ -1,0 +1,9 @@
+[project]
+name = "finance-transaction-analytics-poc"
+version = "0.1.0"
+requires-python = ">=3.10"
+description = "Databricks DAB and Lakeflow SDP retail banking transaction analytics POC"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

@@ -1,0 +1,83 @@
+bundle:
+  name: finance-transaction-analytics
+  engine: direct
+  databricks_cli_version: '>=1.21.0'
+
+include:
+  - resources/jobs/*.yml
+  - resources/pipelines/*.yml
+
+sync:
+  include:
+    - resources/
+    - src/
+    - databricks.yml
+  exclude:
+    - .git
+    - .github/
+    - tests/
+    - fixtures/
+    - README.md
+    - .gitignore
+    - requirements.txt
+    - pyproject.toml
+
+variables:
+  workspace_host:
+    description: Databricks workspace URL for the selected target
+    default: ""
+  catalog:
+    description: Unity Catalog catalog for this environment
+    default: finance_dev
+  schema:
+    description: Schema for the Finance POC
+    default: retail_banking
+  run_as_spn:
+    description: Databricks service principal application ID used to run workloads
+    default: "db346652-f075-4f82-96b2-ad6ad5000ce6"
+  group_name:
+    description: group name
+    default: users
+  job_cluster_id:
+    description: Existing cluster ID in the target workspace
+    default: ""
+
+targets:
+  dev:
+    default: true
+    mode: development
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+    presets:
+      tags:
+        department: htk-dev
+        application: poc-dab
+    workspace:
+      host: https://dbc-7fa028c5-189b.cloud.databricks.com
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+      sync_mode: in-place
+    variables:
+      catalog: finance_dev
+      schema: retail_banking
+    run_as:
+      service_principal_name: ${var.run_as_spn}
+
+  preprod:
+    mode: production
+    permissions:
+      - level: CAN_VIEW
+        user_name: ${workspace.current_user.userName}
+    presets:
+      name_prefix: preprod_
+      tags:
+        department: htk-preprod
+        application: poc-dab
+    workspace:
+      host: https://dbc-7fa028c5-189b.cloud.databricks.com
+      root_path: /Workspace/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog: finance_preprod
+      schema: retail_banking
+    run_as:
+      service_principal_name: ${var.run_as_spn}
