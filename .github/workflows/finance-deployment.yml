@@ -121,6 +121,16 @@ jobs:
       - name: Install Databricks CLI
         uses: databricks/setup-cli@main
 
+      - name: Check credentials (safe)
+        env:
+          DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID || 'db346652-f075-4f82-96b2-ad6ad5000ce6' }}
+          DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+        run: |
+          echo "secret length: ${#DATABRICKS_CLIENT_SECRET}"
+          [[ -z "$DATABRICKS_CLIENT_SECRET" ]] && echo "SECRET IS EMPTY"
+          [[ "$DATABRICKS_CLIENT_SECRET" =~ [[:space:]] ]] && echo "SECRET HAS WHITESPACE"
+          echo "starts with: ${DATABRICKS_CLIENT_SECRET:0:4}"
+
       - name: Verify Databricks identity
         run: databricks current-user me
 
@@ -186,6 +196,16 @@ jobs:
 
       - name: Install Databricks CLI
         uses: databricks/setup-cli@main
+
+      - name: Check credentials (safe)
+        env:
+          DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID || 'db346652-f075-4f82-96b2-ad6ad5000ce6' }}
+          DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+        run: |
+          echo "secret length: ${#DATABRICKS_CLIENT_SECRET}"
+          [[ -z "$DATABRICKS_CLIENT_SECRET" ]] && echo "SECRET IS EMPTY"
+          [[ "$DATABRICKS_CLIENT_SECRET" =~ [[:space:]] ]] && echo "SECRET HAS WHITESPACE"
+          echo "starts with: ${DATABRICKS_CLIENT_SECRET:0:4}"
 
       - name: Verify Databricks identity
         run: databricks current-user me
