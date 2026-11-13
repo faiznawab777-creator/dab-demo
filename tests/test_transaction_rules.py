@@ -1,5 +1,6 @@
 from src.utils.transaction_rules import categorize_merchant, is_valid_transaction
 
+print('testing framework')
 
 def test_categorize_grocery():
     assert categorize_merchant("grocery") == "ESSENTIALS"
