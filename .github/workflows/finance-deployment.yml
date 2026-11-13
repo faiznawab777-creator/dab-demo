@@ -85,12 +85,13 @@ jobs:
 
     env:
       DATABRICKS_AUTH_TYPE: oauth-m2m
-      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
-      DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+      # Not secrets: hardcoded to avoid hidden whitespace in GitHub variables.
+      DATABRICKS_HOST: https://dbc-7fa028c5-189b.cloud.databricks.com
+      DATABRICKS_CLIENT_ID: db346652-f075-4f82-96b2-ad6ad5000ce6
       DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
 
-      BUNDLE_VAR_workspace_host: ${{ vars.DATABRICKS_HOST }}
-      BUNDLE_VAR_run_as_spn: ${{ vars.DATABRICKS_RUN_AS_SP }}
+      BUNDLE_VAR_workspace_host: https://dbc-7fa028c5-189b.cloud.databricks.com
+      BUNDLE_VAR_run_as_spn: db346652-f075-4f82-96b2-ad6ad5000ce6
       BUNDLE_VAR_job_cluster_id: ${{ vars.DATABRICKS_JOB_CLUSTER_ID }}
 
     steps:
@@ -111,7 +112,15 @@ jobs:
         uses: databricks/setup-cli@main
 
       - name: Verify Databricks identity
-        run: databricks current-user me
+        shell: bash
+        run: |
+          set -o pipefail
+          echo "fingerprint: $(printf %s "$DATABRICKS_CLIENT_SECRET" | sha256sum | cut -c1-8)  (expected 068ba141)"
+          echo "client id: [$DATABRICKS_CLIENT_ID] length ${#DATABRICKS_CLIENT_ID} (expected 36)"
+          echo "host: [$DATABRICKS_HOST]"
+          databricks -v
+          env | grep -E '^DATABRICKS_' | sed -E 's/(SECRET|TOKEN)=.*/\1=***/'
+          databricks current-user me
 
       - name: Validate DEV bundle
         working-directory: bundle
@@ -151,12 +160,12 @@ jobs:
 
     env:
       DATABRICKS_AUTH_TYPE: oauth-m2m
-      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
-      DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_HOST: https://dbc-7fa028c5-189b.cloud.databricks.com
+      DATABRICKS_CLIENT_ID: db346652-f075-4f82-96b2-ad6ad5000ce6
       DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
 
-      BUNDLE_VAR_workspace_host: ${{ vars.DATABRICKS_HOST }}
-      BUNDLE_VAR_run_as_spn: ${{ vars.DATABRICKS_RUN_AS_SP }}
+      BUNDLE_VAR_workspace_host: https://dbc-7fa028c5-189b.cloud.databricks.com
+      BUNDLE_VAR_run_as_spn: db346652-f075-4f82-96b2-ad6ad5000ce6
       BUNDLE_VAR_job_cluster_id: ${{ vars.DATABRICKS_JOB_CLUSTER_ID }}
 
     steps:
@@ -176,7 +185,15 @@ jobs:
         uses: databricks/setup-cli@main
 
       - name: Verify Databricks identity
-        run: databricks current-user me
+        shell: bash
+        run: |
+          set -o pipefail
+          echo "fingerprint: $(printf %s "$DATABRICKS_CLIENT_SECRET" | sha256sum | cut -c1-8)  (expected 068ba141)"
+          echo "client id: [$DATABRICKS_CLIENT_ID] length ${#DATABRICKS_CLIENT_ID} (expected 36)"
+          echo "host: [$DATABRICKS_HOST]"
+          databricks -v
+          env | grep -E '^DATABRICKS_' | sed -E 's/(SECRET|TOKEN)=.*/\1=***/'
+          databricks current-user me
 
       - name: Validate PREPROD bundle
         working-directory: bundle
