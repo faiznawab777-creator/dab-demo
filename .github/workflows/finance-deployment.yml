@@ -131,6 +131,18 @@ jobs:
           [[ "$DATABRICKS_CLIENT_SECRET" =~ [[:space:]] ]] && echo "SECRET HAS WHITESPACE"
           echo "starts with: ${DATABRICKS_CLIENT_SECRET:0:4}"
 
+      - name: Debug - test token call and fingerprint
+        env:
+          DATABRICKS_HOST: https://dbc-7fa028c5-189b.cloud.databricks.com
+          DATABRICKS_CLIENT_ID: db346652-f075-4f82-96b2-ad6ad5000ce6
+          DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+        run: |
+          echo "fingerprint: $(printf %s "$DATABRICKS_CLIENT_SECRET" | sha256sum | cut -c1-8)"
+          curl -s -u "$DATABRICKS_CLIENT_ID:$DATABRICKS_CLIENT_SECRET" \
+            -d "grant_type=client_credentials&scope=all-apis" \
+            "$DATABRICKS_HOST/oidc/v1/token" \
+            | sed -E 's/"access_token":"[^"]+"/"access_token":"<redacted>"/'
+
       - name: Verify Databricks identity
         run: databricks current-user me
 
