@@ -144,7 +144,12 @@ jobs:
             | sed -E 's/"access_token":"[^"]+"/"access_token":"<redacted>"/'
 
       - name: Verify Databricks identity
-        run: databricks current-user me
+        run: |
+          echo "fingerprint: $(printf %s "$DATABRICKS_CLIENT_SECRET" | sha256sum | cut -c1-8)"
+          echo "client id: [$DATABRICKS_CLIENT_ID] length ${#DATABRICKS_CLIENT_ID}"
+          databricks -v
+          env | grep -E '^DATABRICKS_' | sed -E 's/(SECRET|TOKEN)=.*/\1=***/'
+          databricks current-user me --debug 2>&1 | head -60
 
       - name: Validate DEV bundle
         working-directory: bundle
@@ -220,7 +225,12 @@ jobs:
           echo "starts with: ${DATABRICKS_CLIENT_SECRET:0:4}"
 
       - name: Verify Databricks identity
-        run: databricks current-user me
+        run: |
+          echo "fingerprint: $(printf %s "$DATABRICKS_CLIENT_SECRET" | sha256sum | cut -c1-8)"
+          echo "client id: [$DATABRICKS_CLIENT_ID] length ${#DATABRICKS_CLIENT_ID}"
+          databricks -v
+          env | grep -E '^DATABRICKS_' | sed -E 's/(SECRET|TOKEN)=.*/\1=***/'
+          databricks current-user me --debug 2>&1 | head -60
 
       - name: Validate PREPROD bundle
         working-directory: bundle
