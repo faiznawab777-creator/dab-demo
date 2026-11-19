@@ -45,7 +45,7 @@ jobs:
         env:
           SCAN_ROOT: ${{ github.workspace }}
         run: |
-          python validation/validation_check.py
+          python validations/validation_check.py
 
       # ============================================
       # 2. SECURITY - GITLEAKS
