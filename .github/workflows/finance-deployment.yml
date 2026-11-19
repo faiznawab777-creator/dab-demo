@@ -1,31 +1,26 @@
-name: Finance POC - DAB Deployment
+
+name: Finance POC - PR Validation
 
 on:
-  push:
+  pull_request:
     branches:
       - main
-
-  # Optional: allows manual redeployment of the current main branch.
-  workflow_dispatch:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
 
 permissions:
   contents: read
 
 concurrency:
-  group: finance-dab-${{ github.ref }}
-  cancel-in-progress: false
+  group: finance-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
-
-  # ----------------------------------------
-  # 1. Build and package the merged revision
-  # ----------------------------------------
-
-  build-artifact:
-    name: Build Finance POC artifact
-
-    if: github.ref == 'refs/heads/main'
-
+  validate-code:
+    name: PR Validation - Centralized Governance
     runs-on: ubuntu-latest
 
     steps:
@@ -38,175 +33,60 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - name: Install test dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests and compile checks
+      # ============================================
+      # 1. CENTRALIZED AST GOVERNANCE VALIDATION
+      # ============================================
+      - name: Run Centralized AST Validation
+        env:
+          SCAN_ROOT: ${{ github.workspace }}
         run: |
-          pytest -q
+          python validation/validation_check.py
+
+      # ============================================
+      # 2. SECURITY - GITLEAKS
+      # ============================================
+      - name: Run Gitleaks
+        run: |
+          gitleaks detect \
+            --source . \
+            --report-format json \
+            --report-path gitleaks-report.json \
+            --exit-code 0
+
+      # ============================================
+      # 3. FORMAT SECURITY REPORT
+      # ============================================
+      - name: Format Gitleaks Report
+        env:
+          SCAN_ROOT: ${{ github.workspace }}
+        run: |
+          python validation/gitleaks_formatter.py
+
+      # ============================================
+      # 4. FINAL GOVERNANCE REPORT & BLOCKING GATE
+      # ============================================
+      - name: Generate Governance Report
+        env:
+          SCAN_ROOT: ${{ github.workspace }}
+        run: |
+          python validation/final_report.py
+
+      # ============================================
+      # 5. TECHNICAL VALIDATION
+      # ============================================
+      - name: Check Git whitespace errors
+        run: |
+          git diff --check
+
+      - name: Compile Python source
+        run: |
           python -m compileall -q src tests
 
-      - name: Package bundle source
-        shell: bash
+      - name: Run unit tests
         run: |
-          files=(databricks.yml resources src pyproject.toml requirements.txt)
-          if [ -f README.md ]; then
-            files+=(README.md)
-          fi
-          tar -czf "finance-dab-${GITHUB_SHA}.tar.gz" "${files[@]}"
-
-      - name: Upload immutable workflow artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: finance-dab-${{ github.sha }}
-          path: finance-dab-${{ github.sha }}.tar.gz
-          if-no-files-found: error
-          retention-days: 30
-
-  # ----------------------------------------
-  # 2. Deploy DEV
-  # ----------------------------------------
-
-  deploy-dev:
-    name: Deploy Finance POC to DEV
-
-    if: github.ref == 'refs/heads/main'
-
-    needs: build-artifact
-
-    runs-on: ubuntu-latest
-
-    environment: dev
-
-    permissions:
-      contents: read
-
-    env:
-      DATABRICKS_AUTH_TYPE: oauth-m2m
-      # Not secrets: hardcoded to avoid hidden whitespace in GitHub variables.
-      DATABRICKS_HOST: https://dbc-7fa028c5-189b.cloud.databricks.com
-      DATABRICKS_CLIENT_ID: db346652-f075-4f82-96b2-ad6ad5000ce6
-      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
-
-      BUNDLE_VAR_workspace_host: https://dbc-7fa028c5-189b.cloud.databricks.com
-      BUNDLE_VAR_run_as_spn: db346652-f075-4f82-96b2-ad6ad5000ce6
-      BUNDLE_VAR_job_cluster_id: ${{ vars.DATABRICKS_JOB_CLUSTER_ID }}
-
-    steps:
-      # No repository checkout here: it would wipe the extracted bundle folder.
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: finance-dab-${{ github.sha }}
-          path: ${{ runner.temp }}/finance-artifact
-
-      - name: Extract artifact
-        run: |
-          mkdir -p "$GITHUB_WORKSPACE/bundle"
-          tar -xzf "$RUNNER_TEMP/finance-artifact/finance-dab-${GITHUB_SHA}.tar.gz" \
-            -C "$GITHUB_WORKSPACE/bundle"
-
-      - name: Install Databricks CLI
-        uses: databricks/setup-cli@main
-
-      - name: Verify Databricks identity
-        shell: bash
-        run: |
-          set -o pipefail
-          echo "fingerprint: $(printf %s "$DATABRICKS_CLIENT_SECRET" | sha256sum | cut -c1-8)  (expected 068ba141)"
-          echo "client id: [$DATABRICKS_CLIENT_ID] length ${#DATABRICKS_CLIENT_ID} (expected 36)"
-          echo "host: [$DATABRICKS_HOST]"
-          databricks -v
-          env | grep -E '^DATABRICKS_' | sed -E 's/(SECRET|TOKEN)=.*/\1=***/'
-          databricks current-user me
-
-      - name: Validate DEV bundle
-        working-directory: bundle
-        run: databricks bundle validate --target dev
-
-      - name: Deploy DEV bundle
-        working-directory: bundle
-        run: databricks bundle deploy --target dev
-
-      - name: Run Finance job in DEV
-        working-directory: bundle
-        run: databricks bundle run --target dev job_finance_transaction_analytics
-
-      - name: Run Finance SDP pipeline in DEV
-        working-directory: bundle
-        run: databricks bundle run --target dev pipeline_finance_transaction_analytics
-
-  # ----------------------------------------
-  # 3. Deploy PREPROD after DEV succeeds
-  # ----------------------------------------
-
-  deploy-preprod:
-    name: Deploy Finance POC to PREPROD
-
-    if: github.ref == 'refs/heads/main'
-
-    needs:
-      - build-artifact
-      - deploy-dev
-
-    runs-on: ubuntu-latest
-
-    environment: preprod
-
-    permissions:
-      contents: read
-
-    env:
-      DATABRICKS_AUTH_TYPE: oauth-m2m
-      DATABRICKS_HOST: https://dbc-7fa028c5-189b.cloud.databricks.com
-      DATABRICKS_CLIENT_ID: db346652-f075-4f82-96b2-ad6ad5000ce6
-      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
-
-      BUNDLE_VAR_workspace_host: https://dbc-7fa028c5-189b.cloud.databricks.com
-      BUNDLE_VAR_run_as_spn: db346652-f075-4f82-96b2-ad6ad5000ce6
-      BUNDLE_VAR_job_cluster_id: ${{ vars.DATABRICKS_JOB_CLUSTER_ID }}
-
-    steps:
-      - name: Download same artifact used in DEV
-        uses: actions/download-artifact@v4
-        with:
-          name: finance-dab-${{ github.sha }}
-          path: ${{ runner.temp }}/finance-artifact
-
-      - name: Extract artifact
-        run: |
-          mkdir -p "$GITHUB_WORKSPACE/bundle"
-          tar -xzf "$RUNNER_TEMP/finance-artifact/finance-dab-${GITHUB_SHA}.tar.gz" \
-            -C "$GITHUB_WORKSPACE/bundle"
-
-      - name: Install Databricks CLI
-        uses: databricks/setup-cli@main
-
-      - name: Verify Databricks identity
-        shell: bash
-        run: |
-          set -o pipefail
-          echo "fingerprint: $(printf %s "$DATABRICKS_CLIENT_SECRET" | sha256sum | cut -c1-8)  (expected 068ba141)"
-          echo "client id: [$DATABRICKS_CLIENT_ID] length ${#DATABRICKS_CLIENT_ID} (expected 36)"
-          echo "host: [$DATABRICKS_HOST]"
-          databricks -v
-          env | grep -E '^DATABRICKS_' | sed -E 's/(SECRET|TOKEN)=.*/\1=***/'
-          databricks current-user me
-
-      - name: Validate PREPROD bundle
-        working-directory: bundle
-        run: databricks bundle validate --target preprod
-
-      - name: Deploy PREPROD bundle
-        working-directory: bundle
-        run: databricks bundle deploy --target preprod
-
-      - name: Run Finance job in PREPROD
-        working-directory: bundle
-        run: databricks bundle run --target preprod job_finance_transaction_analytics
-
-      - name: Run Finance SDP pipeline in PREPROD
-        working-directory: bundle
-        run: databricks bundle run --target preprod pipeline_finance_transaction_analytics
+          pytest -q
