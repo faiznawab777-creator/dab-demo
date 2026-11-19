@@ -20,8 +20,7 @@ concurrency:
 
 jobs:
   validate-code:
-    name: PR validation - Python tests
-
+    name: PR Validation - Centralized Governance
     runs-on: ubuntu-latest
 
     steps:
@@ -34,16 +33,60 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - name: Install test dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # ============================================
+      # 1. CENTRALIZED AST GOVERNANCE VALIDATION
+      # ============================================
+      - name: Run Centralized AST Validation
+        env:
+          SCAN_ROOT: ${{ github.workspace }}
+        run: |
+          python validation/validation_check.py
+
+      # ============================================
+      # 2. SECURITY - GITLEAKS
+      # ============================================
+      - name: Run Gitleaks
+        run: |
+          gitleaks detect \
+            --source . \
+            --report-format json \
+            --report-path gitleaks-report.json \
+            --exit-code 0
+
+      # ============================================
+      # 3. FORMAT SECURITY REPORT
+      # ============================================
+      - name: Format Gitleaks Report
+        env:
+          SCAN_ROOT: ${{ github.workspace }}
+        run: |
+          python validation/gitleaks_formatter.py
+
+      # ============================================
+      # 4. FINAL GOVERNANCE REPORT & BLOCKING GATE
+      # ============================================
+      - name: Generate Governance Report
+        env:
+          SCAN_ROOT: ${{ github.workspace }}
+        run: |
+          python validation/final_report.py
+
+      # ============================================
+      # 5. TECHNICAL VALIDATION
+      # ============================================
       - name: Check Git whitespace errors
-        run: git diff --check
+        run: |
+          git diff --check
 
       - name: Compile Python source
-        run: python -m compileall -q src tests
+        run: |
+          python -m compileall -q src tests
 
       - name: Run unit tests
-        run: pytest -q
+        run: |
+          pytest -q
