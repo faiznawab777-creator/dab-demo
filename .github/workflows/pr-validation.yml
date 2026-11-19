@@ -48,6 +48,22 @@ jobs:
           python validations/validation_check.py
 
       # ============================================
+      # INSTALL GITLEAKS
+      # ============================================
+      - name: Install Gitleaks
+        run: |
+          GITLEAKS_VERSION="8.28.0"
+
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            -o gitleaks.tar.gz
+
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+
+          gitleaks version
+
+      # ============================================
       # 2. SECURITY - GITLEAKS
       # ============================================
       - name: Run Gitleaks
