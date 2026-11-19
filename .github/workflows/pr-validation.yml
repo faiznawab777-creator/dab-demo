@@ -81,7 +81,7 @@ jobs:
         env:
           SCAN_ROOT: ${{ github.workspace }}
         run: |
-          python validation/gitleaks_formatter.py
+          python validations/gitleaks_formatter.py
 
       # ============================================
       # 4. FINAL GOVERNANCE REPORT & BLOCKING GATE
@@ -90,7 +90,7 @@ jobs:
         env:
           SCAN_ROOT: ${{ github.workspace }}
         run: |
-          python validation/final_report.py
+          python validations/final_report.py
 
       # ============================================
       # 5. TECHNICAL VALIDATION
