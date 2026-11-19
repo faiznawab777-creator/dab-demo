@@ -13,7 +13,7 @@ files = get_python_files()
 
 # Automatically discover every rule
 REPO_ROOT = Path(os.environ.get("SCAN_ROOT", "."))
-REPORT_DIR = REPO_ROOT / "validation" / "reports"
+REPORT_DIR = REPO_ROOT / "validations" / "reports"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 loaded_rules = []
@@ -50,5 +50,5 @@ for file, line, msg in violations:
 with open(REPORT_DIR / "ast_report.json", "w") as f:
     json.dump(report, f, indent=2)
 
-print(f"\nAST Validation Completed ({len(report)} violations)")
+print(f"\nAST validations Completed ({len(report)} violations)")
 sys.exit(0)
