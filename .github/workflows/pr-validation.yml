@@ -48,7 +48,7 @@ jobs:
           python validations/validation_check.py
 
       # ============================================
-      # INSTALL GITLEAKS
+      # 1.2 INSTALL GITLEAKS
       # ============================================
       - name: Install Gitleaks
         run: |
