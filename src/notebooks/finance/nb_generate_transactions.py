@@ -2,6 +2,7 @@
 # MAGIC %run ../utils/nb_transaction_helpers
 
 # COMMAND ----------
+
 dbutils.widgets.text("catalog", "finance_dev")
 dbutils.widgets.text("schema", "retail_banking")
 dbutils.widgets.text("batch_size", "100")
@@ -35,3 +36,4 @@ rows = generate_transaction_rows(batch_size=batch_size, batch_label=batch_label)
 spark.createDataFrame(rows).write.format("delta").mode("append").saveAsTable(target_table)
 print(f"Appended {len(rows)} records to {target_table}")
 display(spark.table(target_table).orderBy("transaction_timestamp", ascending=False).limit(10))
+#print(spark.table(target_table).orderBy("transaction_timestamp", ascending=False).limit(10).show(truncate=False))
