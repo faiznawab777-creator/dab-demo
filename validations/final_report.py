@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 REPO_ROOT = Path(os.environ.get("SCAN_ROOT", "."))
-reports = REPO_ROOT / "validation" / "reports"
+reports = REPO_ROOT / "validations" / "reports"
 ast = []
 secret = []
 
@@ -29,10 +29,10 @@ print("            FEATURE STORE GOVERNANCE REPORT")
 print("=" * 69)
 
 # ============================================================
-# Feature Store Validation
+# Feature Store validations
 # ============================================================
 
-print("\nRule_check Validation will be done for : ")
+print("\nRule_check validations will be done for : ")
 print("=" * 69)
 
 Rule_check = [
@@ -41,7 +41,7 @@ Rule_check = [
     "No toPandas()",
     "No display()",
     "No toLocalIterator()",
-    "Python Syntax Validation",
+    "Python Syntax validations",
 ]
 
 print("----------------------------")
@@ -91,18 +91,18 @@ if ast:
             )
         # ---------------- Syntax ----------------
         elif "syntax error" in message:
-            rule = "Python Syntax Validation"
+            rule = "Python Syntax validations"
             recommendation = (
                 "Fix the Python syntax before creating the Pull Request."
             )
         # ---------------- Unknown ----------------
         else:
-            rule = "Validation Rule"
+            rule = "validations Rule"
             recommendation = (
-                "Please review the validation message and update the code."
+                "Please review the validations message and update the code."
             )
         print(f"Rule Name : {rule}")
-        print(f"Validation Message : {v['message']}")
+        print(f"validations Message : {v['message']}")
         print("Recommendation :")
         print(recommendation)
         print(f"File : {v['file']}")
@@ -112,9 +112,9 @@ else:
     print("Result :")
     print("No Violations of Rules detected.")
 # ============================================================
-# Security Validation
+# Security validations
 # ============================================================
-print("\nSecurity Validation")
+print("\nSecurity validations")
 print("=" * 69)
 
 if secret:
@@ -147,16 +147,14 @@ else:
     print("No hardcoded secrets detected.")
 
 # ============================================================
-# Validation Summary
+# validations Summary
 # ============================================================
 print("\n" + "=" * 69)
-print("Validation Summary")
+print("validations Summary")
 print("=" * 69)
 
-files_scanned = len(list((REPO_ROOT / "deployment").rglob("*.py")))
-files_scanned += len(list((REPO_ROOT / "training").rglob("*.py")))
-files_scanned += len(list((REPO_ROOT / "inference").rglob("*.py")))
-files_scanned += len(list((REPO_ROOT / "monitoring").rglob("*.py")))
+files_scanned = len(list((REPO_ROOT / "src").rglob("*.py")))
+
 
 print()
 print(f"Files Scanned       : {files_scanned}")
