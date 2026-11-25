@@ -1,6 +1,5 @@
 import ast
 
-
 def validate(file_path, tree):
 
     violations = []
